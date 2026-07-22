@@ -13,6 +13,21 @@ async function fetchBatchesForAutocomplete() {
     }
 }
 
+// Convert "9:40 AM" to minutes from midnight
+function parseTimeToMinutes(timeStr) {
+    if (!timeStr) return 0;
+    const parts = timeStr.trim().split(" ");
+    const times = parts[0].split(":");
+    let hours = parseInt(times[0], 10);
+    const minutes = parseInt(times[1], 10);
+    const meridiem = parts[1] ? parts[1].toUpperCase() : "AM";
+
+    if (meridiem === "PM" && hours !== 12) hours += 12;
+    if (meridiem === "AM" && hours === 12) hours = 0;
+
+    return hours * 60 + minutes;
+}
+
 async function loadTimetable(selectedElectives = []) {
     const batchInput = document.getElementById("batch");
     const batch = batchInput.value.trim().toUpperCase();
@@ -43,43 +58,45 @@ async function loadTimetable(selectedElectives = []) {
         return;
     }
 
-    // Standard hourly grid for gap alignment
-    const standardHours = [
-        "8:00 AM", "8:50 AM", "9:40 AM", "10:30 AM", "11:20 AM", 
-        "12:10 PM", "1:00 PM", "1:50 PM", "2:40 PM", "3:30 PM", "4:20 PM", "5:10 PM"
-    ];
-
     data.forEach(day => {
         const column = document.createElement("div");
         column.className = "day";
         column.innerHTML = `<h2>${day.day}</h2>`;
 
-        // Map existing classes by time string
-        const classMap = {};
-        day.classes.forEach(c => { classMap[c.time] = c; });
+        const classes = day.classes || [];
 
-        standardHours.forEach(timeSlot => {
-            if (classMap[timeSlot]) {
-                const cls = classMap[timeSlot];
-                const card = document.createElement("div");
-                card.className = "card";
-                card.style.background = cls.color;
-                card.innerHTML = `
-                    <div class="time">${cls.time}</div>
-                    <div class="subject">${cls.subject}</div>
-                    <div class="type">${cls.type}</div>
-                    <div class="info">📍 Room: ${cls.room}</div>
-                    <div class="info">👤 Faculty: ${cls.faculty}</div>
-                `;
-                column.appendChild(card);
-            } else {
-                // Empty Break Slot to preserve timeline height
-                const emptyCard = document.createElement("div");
-                emptyCard.className = "card empty-card";
-                emptyCard.innerHTML = `<div class="time">${timeSlot}</div><div class="break-text">Break</div>`;
-                column.appendChild(emptyCard);
+        // Sort classes chronologically by start time
+        classes.sort((a, b) => parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time));
+
+        for (let i = 0; i < classes.length; i++) {
+            const cls = classes[i];
+
+            // Check if there is a gap (> 60 mins) between this class and the previous one
+            if (i > 0) {
+                const prevMins = parseTimeToMinutes(classes[i - 1].time);
+                const currMins = parseTimeToMinutes(cls.time);
+                
+                // If classes are separated by more than 60 mins, add a Break slot
+                if (currMins - prevMins > 60) {
+                    const breakCard = document.createElement("div");
+                    breakCard.className = "card break-card";
+                    breakCard.innerHTML = `<div class="break-text">☕ Break</div>`;
+                    column.appendChild(breakCard);
+                }
             }
-        });
+
+            const card = document.createElement("div");
+            card.className = "card";
+            card.style.background = cls.color;
+            card.innerHTML = `
+                <div class="time">${cls.time}</div>
+                <div class="subject">${cls.subject}</div>
+                <div class="type">${cls.type}</div>
+                <div class="info">📍 Room: ${cls.room}</div>
+                <div class="info">👤 Faculty: ${cls.faculty}</div>
+            `;
+            column.appendChild(card);
+        }
 
         calendar.appendChild(column);
     });
@@ -111,7 +128,6 @@ function applySingleElective() {
     loadTimetable([select.value]);
 }
 
-// Download PNG using html2canvas
 function downloadPNG() {
     const calendar = document.getElementById("calendar");
     if (!calendar.hasChildNodes()) {
@@ -126,7 +142,6 @@ function downloadPNG() {
     });
 }
 
-// Download PDF using html2canvas + jsPDF
 function downloadPDF() {
     const calendar = document.getElementById("calendar");
     if (!calendar.hasChildNodes()) {

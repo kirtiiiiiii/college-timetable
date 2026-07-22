@@ -1,0 +1,23 @@
+.card.empty-card {
+    background-color: #f1f3f5;
+    border: 1px dashed #ced4da;
+    opacity: 0.6;
+    min-height: 70px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.empty-card .time {
+    color: #868e96;
+    font-size: 0.8rem;
+}
+
+.empty-card .break-text {
+    color: #adb5bd;
+    font-weight: bold;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}

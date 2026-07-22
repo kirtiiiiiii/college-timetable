@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>College Timetable</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- html2canvas and jsPDF for client-side downloads -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+    <div class="header">
+        <h1>College Timetable</h1>
+        <div class="controls">
+            <!-- Autocomplete input using HTML datalist -->
+            <input type="text" id="batch" list="batchList" placeholder="e.g. 3F1D" autocomplete="off">
+            <datalist id="batchList"></datalist>
+
+            <button onclick="loadTimetable()">Generate</button>
+            <button onclick="downloadPNG()" class="secondary">Download PNG</button>
+            <button onclick="downloadPDF()" class="secondary">Download PDF</button>
+        </div>
+    </div>
+
+    <div id="calendar" class="calendar"></div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

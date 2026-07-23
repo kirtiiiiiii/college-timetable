@@ -1,46 +1,55 @@
 import os
-from flask import Flask, jsonify, render_template, request
-
-from core.scanner import WorkbookScanner
+from flask import Flask, render_template, jsonify, request
+import openpyxl
 from core.indexer import BatchIndexer
 from core.extractor import TimetableExtractor
-from core.formatter import TimetableFormatter
 
 app = Flask(__name__)
 
-print("📂 Loading workbook...")
-scanner = WorkbookScanner("uploads/timetable.xlsx")
-scanner.load()
-print("✅ Workbook loaded!")
+# Build absolute path to uploads/timetable.xlsx
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+EXCEL_PATH_UPLOADS = os.path.join(BASE_DIR, 'uploads', 'timetable.xlsx')
+EXCEL_PATH_ROOT = os.path.join(BASE_DIR, 'timetable.xlsx')
 
-indexer = BatchIndexer(scanner.workbook)
+# Check uploads folder first, then root folder
+if os.path.exists(EXCEL_PATH_UPLOADS):
+    EXCEL_PATH = EXCEL_PATH_UPLOADS
+elif os.path.exists(EXCEL_PATH_ROOT):
+    EXCEL_PATH = EXCEL_PATH_ROOT
+else:
+    raise FileNotFoundError(
+        f"\n\n[ERROR] Could not find 'timetable.xlsx' in uploads or root directory!\n"
+        f"Checked paths:\n  - {EXCEL_PATH_UPLOADS}\n  - {EXCEL_PATH_ROOT}\n"
+        "Please ensure your file is named 'timetable.xlsx'."
+    )
+
+print(f"Loading workbook from: {EXCEL_PATH}")
+
+wb = openpyxl.load_workbook(EXCEL_PATH, data_only=True)
+indexer = BatchIndexer(wb)
 batch_index = indexer.build_index()
+extractor = TimetableExtractor(wb, batch_index)
+print(f"Indexed {len(batch_index)} batches successfully!")
 
-extractor = TimetableExtractor(scanner.workbook, batch_index)
+@app.route('/')
+def index():
+    return render_template('index.html')
 
-
-@app.route("/")
-def home():
-    return render_template("index.html")
-
-
-@app.route("/api/batches")
+@app.route('/api/batches')
 def get_batches():
-    # Return sorted list of all available batch names for autocomplete
     return jsonify(sorted(list(batch_index.keys())))
 
-
-@app.route("/timetable/<batch>")
-def timetable(batch):
+@app.route('/timetable/<batch>')
+def get_timetable(batch):
+    batch = batch.upper().strip()
+    
     if batch not in batch_index:
-        return jsonify({"error": "Batch not found"}), 404
+        return jsonify({"error": f"Batch '{batch}' not found!"}), 404
 
-    electives_param = request.args.get("electives", "")
-    selected_electives = [e.strip() for e in electives_param.split(",") if e.strip()]
+    electives_param = request.args.get('electives', '')
+    selected_electives = [e.strip() for e in electives_param.split(',') if e.strip()]
 
-    extracted_timetable, available_electives = extractor.extract(
-        batch, selected_electives=selected_electives
-    )
+    timetable, available_electives = extractor.extract(batch, selected_electives)
 
     if available_electives and not selected_electives:
         return jsonify({
@@ -48,9 +57,7 @@ def timetable(batch):
             "available_electives": available_electives
         })
 
-    formatted = TimetableFormatter(extracted_timetable).format()
-    return jsonify(formatted)
+    return jsonify(timetable)
 
-
-if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=True, use_reloader=False)
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)

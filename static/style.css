@@ -6,151 +6,153 @@
 }
 
 body {
-    background-color: #f4f5f7;
-    padding: 20px;
-    color: #333;
+    background-color: #f8fafc;
+    padding: 16px;
+    color: #1e293b;
 }
 
-.header {
-    text-align: center;
-    margin-bottom: 20px;
-}
-
-.header h1 {
-    font-size: 1.8rem;
-    margin-bottom: 12px;
-}
-
-.controls {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-}
-
-input[type="text"] {
-    padding: 8px 14px;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    font-size: 0.95rem;
-}
-
-button {
-    padding: 8px 16px;
-    background-color: #3b82f6;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-button.secondary {
-    background-color: #6b7280;
-}
-
-/* 7-Column Grid Matrix */
+/* Wrapper for Horizontal Scroll on Mobile */
 .timetable-wrapper {
-    background: #ffffff;
-    padding: 15px;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    overflow-x: auto;
     max-width: 1400px;
     margin: 0 auto;
+    background: #ffffff;
+    padding: 24px;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    overflow-x: auto; /* Enable smooth scrolling on small screens */
+    -webkit-overflow-scrolling: touch;
 }
 
+/* 7-Column Grid Matrix: Time Column + 6 Days */
 .timetable-grid {
     display: grid;
     grid-template-columns: 80px repeat(6, minmax(160px, 1fr));
+    grid-auto-rows: minmax(75px, auto); /* Automatically accommodates all 12 time slots */
     gap: 8px;
-    align-items: center;
+    min-width: 1000px; /* Ensures grid maintains readable proportions on mobile */
 }
 
-/* Headers */
+/* Header Cells */
 .grid-header {
     font-weight: 700;
-    font-size: 1.05rem;
-    padding: 10px;
-    text-align: left;
-    color: #111827;
+    font-size: 1rem;
+    color: #0f172a;
+    padding: 10px 4px;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    background: #ffffff;
+    z-index: 2;
 }
 
-/* Time Slot Labels on Left */
+/* Time Slot Labels (Left Column) */
 .time-slot {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #9ca3af;
-    text-align: right;
-    padding-right: 12px;
-    line-height: 1.2;
-}
-
-/* Slot Containers */
-.slot-cell {
-    min-height: 75px;
-    background-color: #f9fafb;
-    border-radius: 8px;
-    padding: 6px;
     display: flex;
-    align-items: center;
+    flex-direction: column;
     justify-content: center;
+    align-items: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #94a3b8;
+    text-align: center;
+    line-height: 1.2;
+    background: #ffffff;
+    position: sticky;
+    left: 0;
+    z-index: 1;
 }
 
-/* Card Styling Matching Image */
+/* Empty Cell Background (Greyed Out) */
+.slot-cell {
+    background-color: #f1f5f9; /* Soft grey for empty slots */
+    border-radius: 10px;
+    min-height: 75px;
+    padding: 4px;
+    display: flex;
+}
+
+/* Cell holding a 2-period practical block */
+.slot-cell.practical-span {
+    grid-row: span 2; /* Visually merges across 2 rows */
+}
+
+/* Full Solid Class Placard Cards */
 .class-card {
     width: 100%;
     height: 100%;
-    border-radius: 6px;
-    padding: 8px;
-    background-color: #ffffff;
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: #ffffff;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    justify-content: center;
+    gap: 3px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: transform 0.15s ease;
 }
 
-.badge {
-    align-self: flex-start;
-    font-size: 0.65rem;
-    font-weight: 700;
-    padding: 2px 6px;
-    border-radius: 10px;
-    text-transform: capitalize;
-    color: white;
-    margin-bottom: 4px;
+.class-card:hover {
+    transform: scale(1.01);
 }
 
-.badge.lecture { background-color: #84cc16; }
-.badge.practical { background-color: #f97316; }
-.badge.tutorial { background-color: #a855f7; }
-
-.subject-name {
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: #0284c7;
-    line-height: 1.1;
-    margin-bottom: 2px;
+/* Solid Vibrant Colors by Subject Type */
+.class-card.lecture {
+    background-color: #4d8bf5; /* Solid Vibrant Blue */
 }
 
-.room-text {
-    font-size: 0.75rem;
-    color: #6b7280;
-    font-weight: 500;
+.class-card.practical {
+    background-color: #ff4d4d; /* Solid Vibrant Red */
 }
 
-.faculty-text {
-    font-size: 0.75rem;
-    color: #4b5563;
+.class-card.tutorial {
+    background-color: #2ecc71; /* Solid Vibrant Green */
+}
+
+/* Typography Inside Solid Cards */
+.card-time {
+    font-size: 0.7rem;
     font-weight: 600;
+    opacity: 0.9;
 }
 
-.subject-code-tag {
-    align-self: flex-start;
-    font-size: 0.65rem;
-    font-weight: 700;
-    background-color: #ef4444;
-    color: white;
-    padding: 1px 5px;
-    border-radius: 3px;
-    margin-top: 4px;
+.card-subject {
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+}
+
+.card-type {
+    font-size: 0.75rem;
+    font-weight: 600;
+    opacity: 0.9;
+}
+
+.card-details {
+    font-size: 0.7rem;
+    font-weight: 500;
+    opacity: 0.95;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Mobile Adjustments */
+@media (max-width: 768px) {
+    body {
+        padding: 8px;
+    }
+
+    .timetable-wrapper {
+        padding: 12px;
+        border-radius: 10px;
+    }
+
+    .card-subject {
+        font-size: 0.85rem;
+    }
+
+    .card-details {
+        font-size: 0.65rem;
+    }
 }

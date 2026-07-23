@@ -16,8 +16,7 @@ extractor = TimetableExtractor(
     batch_index
 )
 
-timetable = extractor.extract(batch)
 
+timetable, electives = extractor.extract("3F1D")
 formatter = TimetableFormatter(timetable)
-
 formatter.print()

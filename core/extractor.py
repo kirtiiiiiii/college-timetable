@@ -3,10 +3,7 @@ from datetime import time
 from core.detector import StructureDetector
 
 class TimetableExtractor:
-    SUBJECT_PATTERN = re.compile(r"([A-Z]{2,5}\d{3})([LPT])")
-    
-    # Matches codes like B301, C203 LAB, E306, LT102, G204 LAB, etc.
-    ROOM_PATTERN = re.compile(r"^[A-Z0-9\-/]+(\s+LAB)?$", re.IGNORECASE)
+    SUBJECT_PATTERN = re.compile(r"([A-Z]{2,5}\d{3})([LPT])", re.IGNORECASE)
     
     DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
     TIME_STRING = re.compile(r"^\s*(\d{1,2})\s*:\s*(\d{2})\s*:?\s*(AM|PM)?\s*$", re.IGNORECASE)
@@ -27,11 +24,11 @@ class TimetableExtractor:
 
         results = []
         for m in matches:
-            base_code = m.group(1)
-            type_char = m.group(2)
+            base_code = m.group(1).upper()
+            type_char = m.group(2).upper()
             results.append({
                 "base_code": base_code,
-                "code": f"{base_code}{type_char}",
+                "code": base_code,
                 "type": self.TYPE_MAP.get(type_char, "Lecture")
             })
 
@@ -41,6 +38,7 @@ class TimetableExtractor:
         if value is None:
             return None
         if isinstance(value, time):
+            # If Excel stored time without date, convert late afternoon hours if needed
             return value
 
         text = str(value).strip()
@@ -58,6 +56,10 @@ class TimetableExtractor:
                 hour += 12
             elif meridiem == "AM" and hour == 12:
                 hour = 0
+        else:
+            # Handle 12-hour formatted strings missing AM/PM designation (e.g. 5:10 -> 17:10)
+            if 1 <= hour <= 6:
+                hour += 12
 
         return time(hour, minute) if hour <= 23 and minute <= 59 else None
 
@@ -66,6 +68,10 @@ class TimetableExtractor:
             detector = StructureDetector(sheet)
             self._hours_column_cache[sheet.title] = detector.find_hours_column()
         return self._hours_column_cache[sheet.title]
+
+    def format_time_str(self, t_obj):
+        # Outputs "05:10 PM"
+        return t_obj.strftime("%I:%M %p")
 
     def find_day_blocks(self, sheet, hours_column):
         detector = StructureDetector(sheet)
@@ -85,32 +91,47 @@ class TimetableExtractor:
         for i, start in enumerate(starts):
             if i >= len(self.DAYS):
                 break
-            end = starts[i + 1] - 1 if i < len(starts) - 1 else sheet.max_row
+            # Ensure block end captures row offsets all the way to 5:10 PM slot
+            if i < len(starts) - 1:
+                end = starts[i + 1] - 1
+            else:
+                end = min(start + 30, sheet.max_row) # Ensures last day (Saturday) isn't truncated
             blocks.append({"day": self.DAYS[i], "start": start, "end": end})
 
         return blocks
 
-    def get_details(self, sheet, row, column, block_end):
+    def get_details(self, sheet, row, column, block_end, hours_column):
         detector = StructureDetector(sheet)
-        room, faculty = "N/A", "N/A"
+        sub_info = []
+        
+        # Collect details across 4 sub-rows below subject start row
+        for offset in range(1, 4):
+            current_row = row + offset
+            if current_row > block_end:
+                break
 
-        # Check sub-rows immediately underneath subject text for Room & Faculty initials
-        for next_row in range(row + 1, min(row + 3, block_end + 1)):
-            cell_val = detector.get_cell_value(next_row, column)
-            if not cell_val:
+            cell_val = detector.get_cell_value(current_row, column)
+            if cell_val is None:
                 continue
-            
-            text = str(cell_val).strip()
-            if self.parse_subject(text):
-                break  # Stop if reaching the next subject
-            
-            # Identify room strings (e.g. B301, C203 LAB, E306)
-            if self.ROOM_PATTERN.match(text) and room == "N/A":
-                room = text
-            elif len(text) <= 6 and faculty == "N/A":
-                faculty = text
 
-        return {"room": room, "faculty": faculty}
+            text = str(cell_val).strip()
+
+            # Stop if a new subject starts
+            if self.parse_subject(text):
+                break
+
+            text_upper = text.upper()
+            if text_upper in ["DAY", "HOURS", "SR NO", "SR.NO", "LAB"]:
+                continue
+
+            if text not in sub_info:
+                sub_info.append(text)
+
+        return " • ".join(sub_info) if sub_info else ""
+
+    def format_time_str(self, t_obj):
+        # Always format time with leading zeros, e.g. "08:00 AM" or "05:10 PM"
+        return t_obj.strftime("%I:%M %p")
 
     def extract(self, batch, selected_electives=None):
         if selected_electives is None:
@@ -122,57 +143,78 @@ class TimetableExtractor:
         column = info["column"]
 
         hours_column = self.get_hours_column(sheet)
-        if hours_column is None:
-            raise ValueError(f"No HOURS column found on sheet '{sheet.title}'.")
-
         timetable = {}
         day_blocks = self.find_day_blocks(sheet, hours_column)
         all_elective_options = set()
 
         for block in day_blocks:
             lectures = []
-
+            
+            # Get list of all valid time slot rows in this day
+            time_rows = []
             for row in range(block["start"], block["end"] + 1):
                 raw_time = detector.get_cell_value(row, hours_column)
-                time_value = self.normalize_time(raw_time)
-                if time_value is None:
-                    continue
+                t_val = self.normalize_time(raw_time)
+                if t_val is not None:
+                    time_rows.append({"row": row, "time": t_val})
+
+            idx = 0
+            while idx < len(time_rows):
+                tr = time_rows[idx]
+                row = tr["row"]
+                time_value = tr["time"]
 
                 value = detector.get_cell_value(row, column)
                 parsed = self.parse_subject(value)
                 if parsed is None:
+                    idx += 1
                     continue
 
-                details = self.get_details(sheet, row, column, block["end"])
-                formatted_time = time_value.strftime("%I:%M %p")
+                details_text = self.get_details(sheet, row, column, block["end"], hours_column)
+                formatted_time = self.format_time_str(time_value)
 
                 if isinstance(parsed, list):
                     for s in parsed:
                         all_elective_options.add(s["base_code"])
 
                     if selected_electives:
-                        matching = [
-                            s for s in parsed
-                            if s["base_code"] in selected_electives or s["code"] in selected_electives
-                        ]
-                        subjects_to_add = matching
+                        subjects_to_add = [s for s in parsed if s["base_code"] in selected_electives]
                     else:
                         subjects_to_add = [{
-                            "code": " / ".join([s["code"] for s in parsed]),
+                            "code": " / ".join([s["base_code"] for s in parsed]),
                             "base_code": "ELECTIVE_SLOT",
                             "type": parsed[0]["type"]
                         }]
                 else:
                     subjects_to_add = [parsed]
 
+                is_practical = any(s["type"] == "Practical" for s in subjects_to_add)
+
                 for subj in subjects_to_add:
+                    # Period 1
                     lectures.append({
                         "time": formatted_time,
                         "subject": subj["code"],
                         "type": subj["type"],
-                        "room": details["room"],
-                        "faculty": details["faculty"]
+                        "info": details_text
                     })
+
+                    # Period 2 (If Practical / Lab)
+                    if subj["type"] == "Practical" and (idx + 1) < len(time_rows):
+                        next_time_val = time_rows[idx + 1]["time"]
+                        next_formatted_time = self.format_time_str(next_time_val)
+                        lectures.append({
+                            "time": next_formatted_time,
+                            "subject": subj["code"],
+                            "type": subj["type"],
+                            "info": details_text
+                        })
+
+                # Skip the next time slot if this was a 2-period practical
+                if is_practical and (idx + 1) < len(time_rows):
+                    idx += 2
+                else:
+                    idx += 1
 
             timetable[block["day"]] = lectures
 

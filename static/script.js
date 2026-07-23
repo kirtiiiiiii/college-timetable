@@ -13,20 +13,12 @@ async function fetchBatchesForAutocomplete() {
     }
 }
 
-// Convert "9:40 AM" to minutes from midnight
-function parseTimeToMinutes(timeStr) {
-    if (!timeStr) return 0;
-    const parts = timeStr.trim().split(" ");
-    const times = parts[0].split(":");
-    let hours = parseInt(times[0], 10);
-    const minutes = parseInt(times[1], 10);
-    const meridiem = parts[1] ? parts[1].toUpperCase() : "AM";
+const standardSlots = [
+    "08:00 AM", "08:50 AM", "09:40 AM", "10:30 AM", "11:20 AM",
+    "12:10 PM", "01:00 PM", "01:50 PM", "02:40 PM", "03:30 PM", "04:20 PM", "05:10 PM"
+];
 
-    if (meridiem === "PM" && hours !== 12) hours += 12;
-    if (meridiem === "AM" && hours === 12) hours = 0;
-
-    return hours * 60 + minutes;
-}
+const daysList = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 async function loadTimetable(selectedElectives = []) {
     const batchInput = document.getElementById("batch");
@@ -45,8 +37,8 @@ async function loadTimetable(selectedElectives = []) {
     const response = await fetch(url);
     const data = await response.json();
 
-    const calendar = document.getElementById("calendar");
-    calendar.innerHTML = "";
+    const grid = document.getElementById("timetableGrid");
+    grid.innerHTML = "";
 
     if (data.requires_electives) {
         renderGlobalElectivePicker(data.available_electives);
@@ -58,59 +50,73 @@ async function loadTimetable(selectedElectives = []) {
         return;
     }
 
-    data.forEach(day => {
-        const column = document.createElement("div");
-        column.className = "day";
-        column.innerHTML = `<h2>${day.day}</h2>`;
+    // 1. Build Header Row (Time + Days)
+    grid.appendChild(createHeaderCell("Time"));
+    daysList.forEach(day => grid.appendChild(createHeaderCell(day)));
 
-        const classes = day.classes || [];
+    // Index API payload by day and formatted time
+    const scheduleMap = {};
+    data.forEach(d => {
+        scheduleMap[d.day] = {};
+        (d.classes || []).forEach(c => {
+            scheduleMap[d.day][c.time] = c;
+        });
+    });
 
-        // Sort classes chronologically by start time
-        classes.sort((a, b) => parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time));
+    // 2. Build Grid Row by Row for each standard time slot
+    standardSlots.forEach(slot => {
+        // Time Label Column
+        const timeCell = document.createElement("div");
+        timeCell.className = "time-slot";
+        const [timePart, meridiem] = slot.split(" ");
+        timeCell.innerHTML = `<div>${timePart}</div><div>${meridiem}</div>`;
+        grid.appendChild(timeCell);
 
-        for (let i = 0; i < classes.length; i++) {
-            const cls = classes[i];
+        // Day Cells
+        daysList.forEach(day => {
+            const cell = document.createElement("div");
+            cell.className = "slot-cell";
 
-            // Check if there is a gap (> 60 mins) between this class and the previous one
-            if (i > 0) {
-                const prevMins = parseTimeToMinutes(classes[i - 1].time);
-                const currMins = parseTimeToMinutes(cls.time);
+            const cls = scheduleMap[day] && scheduleMap[day][slot];
+            if (cls) {
+                const card = document.createElement("div");
+                card.className = "class-card";
                 
-                // If classes are separated by more than 60 mins, add a Break slot
-                if (currMins - prevMins > 60) {
-                    const breakCard = document.createElement("div");
-                    breakCard.className = "card break-card";
-                    breakCard.innerHTML = `<div class="break-text">☕ Break</div>`;
-                    column.appendChild(breakCard);
-                }
+                const typeClass = (cls.type || "Lecture").toLowerCase();
+
+                card.innerHTML = `
+                    <div>
+                        <span class="badge ${typeClass}">${cls.type}</span>
+                        <div class="subject-name">${cls.subject}</div>
+                        <div class="room-text">${cls.room !== 'N/A' ? cls.room : ''}</div>
+                        <div class="faculty-text">${cls.faculty !== 'N/A' ? cls.faculty : ''}</div>
+                    </div>
+                    <span class="subject-code-tag">${cls.subject}</span>
+                `;
+                cell.appendChild(card);
             }
 
-            const card = document.createElement("div");
-            card.className = "card";
-            card.style.background = cls.color;
-            card.innerHTML = `
-                <div class="time">${cls.time}</div>
-                <div class="subject">${cls.subject}</div>
-                <div class="type">${cls.type}</div>
-                <div class="info">📍 Room: ${cls.room}</div>
-                <div class="info">👤 Faculty: ${cls.faculty}</div>
-            `;
-            column.appendChild(card);
-        }
-
-        calendar.appendChild(column);
+            grid.appendChild(cell);
+        });
     });
 }
 
+function createHeaderCell(text) {
+    const div = document.createElement("div");
+    div.className = "grid-header";
+    div.innerText = text;
+    return div;
+}
+
 function renderGlobalElectivePicker(availableElectives) {
-    const calendar = document.getElementById("calendar");
+    const grid = document.getElementById("timetableGrid");
     let optionsHtml = availableElectives.map(code => `<option value="${code}">${code}</option>`).join("");
 
-    calendar.innerHTML = `
-        <div style="grid-column: span 6; background: white; padding: 40px; border-radius: 18px; box-shadow: 0 10px 20px rgba(0,0,0,.08); text-align: center; max-width: 500px; margin: 0 auto;">
+    grid.innerHTML = `
+        <div style="grid-column: span 7; background: white; padding: 40px; border-radius: 12px; text-align: center; max-width: 450px; margin: 20px auto;">
             <h2>Select Your Elective Course</h2>
             <p style="margin: 10px 0 20px 0; color: #666;">Choose your elective course once to apply it across all days.</p>
-            <select id="singleElectiveSelect" style="width: 100%; padding: 12px; border-radius: 10px; font-size: 16px; border: 1px solid #ccc; margin-bottom: 20px;">
+            <select id="singleElectiveSelect" style="width: 100%; padding: 10px; border-radius: 6px; font-size: 15px; border: 1px solid #ccc; margin-bottom: 20px;">
                 <option value="" disabled selected>-- Choose Course --</option>
                 ${optionsHtml}
             </select>
@@ -129,12 +135,8 @@ function applySingleElective() {
 }
 
 function downloadPNG() {
-    const calendar = document.getElementById("calendar");
-    if (!calendar.hasChildNodes()) {
-        alert("Please generate a timetable first!");
-        return;
-    }
-    html2canvas(calendar, { scale: 2 }).then(canvas => {
+    const wrapper = document.getElementById("timetableWrapper");
+    html2canvas(wrapper, { scale: 2 }).then(canvas => {
         const link = document.createElement("a");
         link.download = "Timetable.png";
         link.href = canvas.toDataURL("image/png");
@@ -143,12 +145,8 @@ function downloadPNG() {
 }
 
 function downloadPDF() {
-    const calendar = document.getElementById("calendar");
-    if (!calendar.hasChildNodes()) {
-        alert("Please generate a timetable first!");
-        return;
-    }
-    html2canvas(calendar, { scale: 2 }).then(canvas => {
+    const wrapper = document.getElementById("timetableWrapper");
+    html2canvas(wrapper, { scale: 2 }).then(canvas => {
         const imgData = canvas.toDataURL("image/png");
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF("landscape", "pt", "a4");

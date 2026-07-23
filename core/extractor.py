@@ -5,16 +5,8 @@ from core.detector import StructureDetector
 class TimetableExtractor:
     SUBJECT_PATTERN = re.compile(r"([A-Z]{2,5}\d{3})([LPT])")
     
-    # Matches strings like "NS (C201)" or "Faculty(Room)"
-    FACULTY_ROOM_COMBINED = re.compile(
-        r"^\s*([A-Z0-9\-_/]+)\s*\(\s*([A-Z0-9\-_/]+)\s*\)\s*$", re.IGNORECASE
-    )
-    
-    # Matches rooms like C201, LT102, LP101, VL103, T101, etc.
-    ROOM = re.compile(r"^(?:[A-Z]{1,3}\d{2,4}|LT\d{3}|VL\d{3}|LP\d{3}|[A-Z]\d{3})$", re.IGNORECASE)
-    
-    # Matches faculty initials like AB, NS-1, CS/AK
-    FACULTY = re.compile(r"^[A-Z]{1,5}(-\d+)?(/[A-Z]{1,5}(-\d+)?)*$", re.IGNORECASE)
+    # Matches codes like B301, C203 LAB, E306, LT102, G204 LAB, etc.
+    ROOM_PATTERN = re.compile(r"^[A-Z0-9\-/]+(\s+LAB)?$", re.IGNORECASE)
     
     DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
     TIME_STRING = re.compile(r"^\s*(\d{1,2})\s*:\s*(\d{2})\s*:?\s*(AM|PM)?\s*$", re.IGNORECASE)
@@ -98,40 +90,27 @@ class TimetableExtractor:
 
         return blocks
 
-    def get_details(self, sheet, row, column, block_end, hours_column):
+    def get_details(self, sheet, row, column, block_end):
         detector = StructureDetector(sheet)
-        room, faculty, lab = "N/A", "N/A", False
-        current = row + 1
+        room, faculty = "N/A", "N/A"
 
-        # Read down up to 3 rows below the subject line to catch Room/Faculty info
-        while current <= min(row + 3, block_end):
-            if self.normalize_time(detector.get_cell_value(current, hours_column)) is not None:
-                break
-            cell_val = detector.get_cell_value(current, column)
-            if cell_val is not None and self.parse_subject(cell_val):
-                break
+        # Check sub-rows immediately underneath subject text for Room & Faculty initials
+        for next_row in range(row + 1, min(row + 3, block_end + 1)):
+            cell_val = detector.get_cell_value(next_row, column)
+            if not cell_val:
+                continue
+            
+            text = str(cell_val).strip()
+            if self.parse_subject(text):
+                break  # Stop if reaching the next subject
+            
+            # Identify room strings (e.g. B301, C203 LAB, E306)
+            if self.ROOM_PATTERN.match(text) and room == "N/A":
+                room = text
+            elif len(text) <= 6 and faculty == "N/A":
+                faculty = text
 
-            if cell_val is not None:
-                text = str(cell_val).strip()
-                if text.upper() == "LAB":
-                    lab = True
-                else:
-                    combined = self.FACULTY_ROOM_COMBINED.match(text)
-                    if combined:
-                        faculty, room = combined.group(1).upper(), combined.group(2).upper()
-                    elif self.is_room(text):
-                        room = text.upper()
-                    elif self.is_faculty(text):
-                        faculty = text.upper()
-            current += 1
-
-        return {"room": room, "faculty": faculty, "lab": lab}
-
-    def is_room(self, text):
-        return bool(self.ROOM.match(text.strip()))
-
-    def is_faculty(self, text):
-        return bool(self.FACULTY.match(text.strip()))
+        return {"room": room, "faculty": faculty}
 
     def extract(self, batch, selected_electives=None):
         if selected_electives is None:
@@ -164,8 +143,8 @@ class TimetableExtractor:
                 if parsed is None:
                     continue
 
-                details = self.get_details(sheet, row, column, block["end"], hours_column)
-                formatted_time = time_value.strftime("%I:%M %p").lstrip("0")
+                details = self.get_details(sheet, row, column, block["end"])
+                formatted_time = time_value.strftime("%I:%M %p")
 
                 if isinstance(parsed, list):
                     for s in parsed:
@@ -181,8 +160,7 @@ class TimetableExtractor:
                         subjects_to_add = [{
                             "code": " / ".join([s["code"] for s in parsed]),
                             "base_code": "ELECTIVE_SLOT",
-                            "type": parsed[0]["type"],
-                            "is_elective": True
+                            "type": parsed[0]["type"]
                         }]
                 else:
                     subjects_to_add = [parsed]
@@ -193,8 +171,7 @@ class TimetableExtractor:
                         "subject": subj["code"],
                         "type": subj["type"],
                         "room": details["room"],
-                        "faculty": details["faculty"],
-                        "lab": details["lab"]
+                        "faculty": details["faculty"]
                     })
 
             timetable[block["day"]] = lectures

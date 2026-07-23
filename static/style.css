@@ -2,134 +2,155 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 body {
-    background-color: #f0f2f5;
+    background-color: #f4f5f7;
     padding: 20px;
     color: #333;
 }
 
 .header {
     text-align: center;
-    margin-bottom: 25px;
+    margin-bottom: 20px;
 }
 
 .header h1 {
-    margin-bottom: 15px;
-    font-size: 2rem;
+    font-size: 1.8rem;
+    margin-bottom: 12px;
 }
 
 .controls {
     display: flex;
     justify-content: center;
     gap: 10px;
-    flex-wrap: wrap;
 }
 
 input[type="text"] {
-    padding: 10px 16px;
+    padding: 8px 14px;
     border: 1px solid #ccc;
-    border-radius: 8px;
-    font-size: 1rem;
-    outline: none;
+    border-radius: 6px;
+    font-size: 0.95rem;
 }
 
 button {
-    padding: 10px 20px;
-    background-color: #4a90e2;
+    padding: 8px 16px;
+    background-color: #3b82f6;
     color: white;
     border: none;
-    border-radius: 8px;
+    border-radius: 6px;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s;
-}
-
-button:hover {
-    background-color: #357abd;
 }
 
 button.secondary {
-    background-color: #6c757d;
+    background-color: #6b7280;
 }
 
-button.secondary:hover {
-    background-color: #5a6268;
-}
-
-/* FIX: Ensure columns lay out horizontally in 6 equal columns */
-.calendar {
-    display: grid;
-    grid-template-columns: repeat(6, minmax(180px, 1fr));
-    gap: 15px;
-    align-items: start;
-    width: 100%;
-    max-width: 1600px;
-    margin: 0 auto;
-    overflow-x: auto;
-}
-
-.day {
+/* 7-Column Grid Matrix */
+.timetable-wrapper {
     background: #ffffff;
+    padding: 15px;
     border-radius: 12px;
-    padding: 12px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    overflow-x: auto;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.timetable-grid {
+    display: grid;
+    grid-template-columns: 80px repeat(6, minmax(160px, 1fr));
+    gap: 8px;
+    align-items: center;
+}
+
+/* Headers */
+.grid-header {
+    font-weight: 700;
+    font-size: 1.05rem;
+    padding: 10px;
+    text-align: left;
+    color: #111827;
+}
+
+/* Time Slot Labels on Left */
+.time-slot {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #9ca3af;
+    text-align: right;
+    padding-right: 12px;
+    line-height: 1.2;
+}
+
+/* Slot Containers */
+.slot-cell {
+    min-height: 75px;
+    background-color: #f9fafb;
+    border-radius: 8px;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Card Styling Matching Image */
+.class-card {
+    width: 100%;
+    height: 100%;
+    border-radius: 6px;
+    padding: 8px;
+    background-color: #ffffff;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    justify-content: space-between;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
 
-.day h2 {
-    text-align: center;
-    font-size: 1.1rem;
-    padding-bottom: 8px;
-    border-bottom: 2px solid #eee;
-    color: #111;
-}
-
-/* Class Card styling */
-.card {
-    border-radius: 8px;
-    padding: 10px;
+.badge {
+    align-self: flex-start;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+    text-transform: capitalize;
     color: white;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    margin-bottom: 4px;
 }
 
-.card .time {
+.badge.lecture { background-color: #84cc16; }
+.badge.practical { background-color: #f97316; }
+.badge.tutorial { background-color: #a855f7; }
+
+.subject-name {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #0284c7;
+    line-height: 1.1;
+    margin-bottom: 2px;
+}
+
+.room-text {
     font-size: 0.75rem;
-    font-weight: bold;
-    opacity: 0.9;
+    color: #6b7280;
+    font-weight: 500;
 }
 
-.card .subject {
-    font-size: 1rem;
-    font-weight: 800;
-    margin: 2px 0;
-}
-
-.card .type {
-    font-size: 0.8rem;
-    margin-bottom: 6px;
-}
-
-.card .info {
+.faculty-text {
     font-size: 0.75rem;
-    opacity: 0.95;
-}
-
-/* FIX: Subtle Break Card styling */
-.card.break-card {
-    background-color: #f8f9fa !important;
-    border: 1px dashed #ced4da;
-    color: #6c757d;
-    text-align: center;
-    padding: 6px;
-    box-shadow: none;
-}
-
-.card.break-card .break-text {
+    color: #4b5563;
     font-weight: 600;
-    font-size: 0.8rem;
+}
+
+.subject-code-tag {
+    align-self: flex-start;
+    font-size: 0.65rem;
+    font-weight: 700;
+    background-color: #ef4444;
+    color: white;
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin-top: 4px;
 }
